@@ -94,7 +94,7 @@ def generate_set(set_size):
         json_str = json.dumps(set, indent=4)
         f.write(json_str)
 
-def create_train_model(size, hidden_nodes, num_iters, loss_plot):
+def create_train_model():
     # Reset the graph
     tf.reset_default_graph()
     tf.disable_v2_behavior()
@@ -102,9 +102,6 @@ def create_train_model(size, hidden_nodes, num_iters, loss_plot):
     data = []
     with open('C:/dev/holodecoder_training_set_1.json') as f:
         data = json.load(f)
-    
-    xs = []
-    ys = []
 
     xmin = 0
     xmax = 0
@@ -113,99 +110,31 @@ def create_train_model(size, hidden_nodes, num_iters, loss_plot):
         curr_max = max(entry['decoded'])
         xmin = curr_min if curr_min < xmin else xmin
         xmax = curr_max if curr_min > xmax else xmax
-
+    
+    xs = []
+    ys = []
     for entry in data:
-        fixed = list(map(lambda x: (x + abs(xmin)) / (abs(xmin) + abs(xmax)), entry['decoded']))
-        xs.append([fixed])
-        ys.append([entry['value'] / 256.0])
-    
-    # Xtrain = frame
-    # #Xtest = data.head(200).drop(columns=['amount_of_errors', 'value']).explode('decoded').transpose()
-    # ytrain = pd.get_dummies('value')
-    # # ytest = pd.get_dummies(data.head(200).value)
-    
-    # print(frame)
-    # print(Xtrain)
-    # print(ytrain)
+        #fixed = list(map(lambda x: (x + abs(xmin)) / (abs(xmin) + abs(xmax)), entry['decoded']))
+        #xs.append(fixed)
+        xs.append(entry['decoded'])
+        # ys.append([entry['value'] / 256.0])
+        ys.append([entry['value']])
 
-    # Placeholders for input and output data
-    X = tf.placeholder(shape=(1000, size), dtype=tf.float64, name='X')
-    y = tf.placeholder(shape=(1000, 1), dtype=tf.float64, name='y')
+    xs = tf.keras.utils.normalize(xs)
+    ys = tf.keras.utils.normalize(ys)
+    xs = np.asarray(xs)
+    ys = np.asarray(ys)
+    xs_train = xs[1:800];
+    ys_train = ys[1:800];
+    xs_test = xs[800:1000];
+    ys_test = ys[800:1000];
 
-    # Variables for two group of weights between the three layers of the network
-    W1 = tf.Variable(np.random.rand(size, hidden_nodes), dtype=tf.float64)
-    W2 = tf.Variable(np.random.rand(hidden_nodes, 1), dtype=tf.float64)
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Dense(10, activation='sigmoid'))
+    model.add(tf.keras.layers.Dense(10, activation='sigmoid'))
+    model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
+    # As signified by loss = 'mean_squared_error', you are in a regression setting, where accuracy is meaningless (it is meaningful only in classification problems).
+    model.compile(optimizer='adam', loss='mse', metrics=["mae"])
+    model.fit(xs_train, ys_train, epochs=1000, validation_data=(xs_test, ys_test))
 
-    # Create the neural net graph
-    A1 = tf.sigmoid(tf.matmul(X, W1))
-    y_est = tf.sigmoid(tf.matmul(A1, W2))
-
-    # Define a loss function
-    #deltas = tf.square(y_est - y)
-    deltas = tf.abs(y_est - y)
-    loss = tf.reduce_sum(deltas)
-
-    # Define a train operation to minimize the loss
-    optimizer = tf.train.GradientDescentOptimizer(0.005)
-    train = optimizer.minimize(loss)
-
-    # Initialize variables and run session
-    init = tf.global_variables_initializer()
-    sess = tf.Session()
-    sess.run(init)
-
-    pdxs = pd.DataFrame(np.concatenate(xs))
-    pdys = pd.DataFrame(np.concatenate(ys)) 
-
-    print(pdxs)
-    print(pdys)
-
-    # Go through num_iters iterations
-    for i in range(num_iters):
-        sess.run(train, feed_dict={X: pdxs, y: pdys})
-        loss = sess.run(loss, feed_dict={X: pdxs.values, y: pdys.values})
-        loss_plot[hidden_nodes].append(loss)
-        weights1 = sess.run(W1)
-        weights2 = sess.run(W2)
-        
-    print("loss (hidden nodes: %d, iterations: %d): %.2f" % (hidden_nodes, num_iters, loss_plot[hidden_nodes][-1]))
-    sess.close()
-    return weights1, weights2
-
-size = 256
-
-num_iters = 100
-num_hidden_nodes = [5, 10, 20]
-loss_plot = {5: [], 10: [], 20: []}
-weights1 = {5: None, 10: None, 20: None}
-weights2 = {5: None, 10: None, 20: None}
-
-plt.figure(figsize=(12,8))
-for hidden_nodes in num_hidden_nodes:
-    weights1[hidden_nodes], weights2[hidden_nodes] = create_train_model(size, hidden_nodes, num_iters, loss_plot)
-    plt.plot(range(num_iters), loss_plot[hidden_nodes], label="nn: 4-%d-3" % hidden_nodes)
-
-plt.xlabel('Iteration', fontsize=12)
-plt.ylabel('Loss', fontsize=12)
-plt.legend(fontsize=12)
-plt.show()
-
-# tensorflowinputs = tf.placeholder(tf.float32, shape=(None, X_train.shape[1]), name='inputs')
-# label = tf.placeholder(tf.float32, shape=(None, 2), name='labels')
-
-# # First layer
-# hid1_size = 128
-# w1 = tf.Variable(tf.random_normal([hid1_size, X_train.shape[1]], stddev=0.01), name='w1')
-# b1 = tf.Variable(tf.constant(0.1, shape=(hid1_size, 1)), name='b1')
-# y1 = tf.nn.dropout(tf.nn.relu(tf.add(tf.matmul(w1, tf.transpose(inputs)), b1)), keep_prob=0.5)
-
-# # Second layer
-# hid2_size = 256
-# w2 = tf.Variable(tf.random_normal([hid2_size, hid1_size], stddev=0.01), name='w2')
-# b2 = tf.Variable(tf.constant(0.1, shape=(hid2_size, 1)), name='b2')
-# y2 = tf.nn.dropout(tf.nn.relu(tf.add(tf.matmul(w2, y1), b2)), keep_prob=0.5)
-
-# # Output layer
-# wo = tf.Variable(tf.random_normal([2, hid2_size], stddev=0.01), name='wo')
-# bo = tf.Variable(tf.random_normal([2, 1]), name='bo')
-# yo = tf.transpose(tf.add(tf.matmul(wo, y2), bo))
+create_train_model()
