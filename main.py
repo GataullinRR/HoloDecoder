@@ -6,6 +6,9 @@ from numpy import random
 import json
 import tensorflow.compat.v1 as tf
 import pandas as pd
+import time
+import signal
+import multiprocessing
 
 def code(value, obj_size):
     obj_size = 256
@@ -97,46 +100,54 @@ def load(name):
 
     return (xs, ys, errors)
 
-def create_train_model():
-    # Reset the graph
-    tf.reset_default_graph()
-    tf.disable_v2_behavior()
-
-    data = []
-    with open('C:/dev/holodecoder_training_set_1.json') as f:
-        data = json.load(f)
-
-    xs = []
-    ys = []
-    for entry in data:
-        xs.append(entry['decoded'])
-        ys.append([entry['value']])
-
-    xs = tf.keras.utils.normalize(xs)
-    ys = tf.keras.utils.normalize(ys)
+def train_model(set_name, model_name, k, rate):
+    xs, ys, _ = load(set_name)
     xs = np.asarray(xs)
     ys = np.asarray(ys)
-    xs_train = xs[1:800];
-    ys_train = ys[1:800];
-    xs_test = xs[800:1000];
-    ys_test = ys[800:1000];
+    train_set_size = int(fix(ys.size * 0.8))
+    xs_train = xs[1:train_set_size];
+    ys_train = ys[1:train_set_size];
+    xs_test = xs[train_set_size:ys.size];
+    ys_test = ys[train_set_size:ys.size];
 
     model = tf.keras.Sequential()
-    model.add(tf.keras.layers.Dense(10, activation='sigmoid'))
-    model.add(tf.keras.layers.Dense(10, activation='sigmoid'))
+    model.add(tf.keras.layers.Dense(256 * k, activation=tf.nn.sigmoid))
+    model.add(tf.keras.layers.Dense(100 * k, activation=tf.nn.sigmoid))
+    model.add(tf.keras.layers.Dense(50 * k, activation=tf.nn.sigmoid))
+    model.add(tf.keras.layers.Dense(10 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
     # As signified by loss = 'mean_squared_error', you are in a regression setting, where accuracy is meaningless (it is meaningful only in classification problems).
-    model.compile(optimizer='adam', loss='mse', metrics=["mae"])
-    model.fit(xs_train, ys_train, epochs=1000, validation_data=(xs_test, ys_test))
+    opt = tf.keras.optimizers.Adam(learning_rate=rate)
+    model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
+    history_callback = model.fit(xs_train, ys_train, epochs=10000, validation_data=(xs_test, ys_test))
 
-#create_train_model()
+    tf.keras.models.save_model(model, 'C:/dev/' + model_name)
+    loss_history = history_callback.history["loss"]
+    numpy_loss_history = np.array(loss_history)
+    np.savetxt('C:/dev/' + model_name + "/loss_history.txt", numpy_loss_history, delimiter=",")
 
-generate_set(10, 256, "set_2.json")
-xs, ys, errors = load('set_2.json')
-cnt = 5
-fig, axs = plt.subplots(cnt)
-for i in range(cnt):
-    print("Err: " + str(errors[i][0]) + ' - y: ' + str(ys[i][0]))
-    axs[i].bar(range(0, xs[i].size), xs[i])
-fig.tight_layout()
-plt.show()
+# generate_set(10000, 256, "set_256_10000_1.json")
+# generate_set(10000, 256, "set_256_10000_2.json")
+# generate_set(5000, 256, "set_256_5000_3.json")
+# generate_set(5000, 256, "set_256_5000_4.json")
+# generate_set(20000, 256, "set_256_20000_5.json")
+
+train_model("set_256_10000_1.json", "model1_1", 0.5, 0.001)
+train_model("set_256_10000_1.json", "model1_2", 0.5, 0.003)
+train_model("set_256_10000_1.json", "model1_3", 0.5, 0.006)
+train_model("set_256_10000_1.json", "model2", 1, 0.003) 
+train_model("set_256_10000_1.json", "model3", 2, 0.003) 
+train_model("set_256_10000_1.json", "model4_1", 5, 0.001)
+train_model("set_256_10000_1.json", "model4_2", 5, 0.003)
+train_model("set_256_10000_1.json", "model4_3", 5, 0.006)
+
+# train_model("set_256_10000_1.json", "model3")
+
+# xs, ys, errors = load('set_2.json')
+# cnt = 5
+# fig, axs = plt.subplots(cnt)
+# for i in range(cnt):
+#     print("Err: " + str(errors[i][0]) + ' - y: ' + str(ys[i][0]))
+#     axs[i].bar(range(0, xs[i].size), xs[i])
+# fig.tight_layout()
+# plt.show()
