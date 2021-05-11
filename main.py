@@ -132,16 +132,31 @@ def train_model(set_name, model_name, k, rate):
 # generate_set(5000, 256, "set_256_5000_4.json")
 # generate_set(20000, 256, "set_256_20000_5.json")
 
-train_model("set_256_10000_1.json", "model1_1", 0.5, 0.001)
-train_model("set_256_10000_1.json", "model1_2", 0.5, 0.003)
-train_model("set_256_10000_1.json", "model1_3", 0.5, 0.006)
-train_model("set_256_10000_1.json", "model2", 1, 0.003) 
-train_model("set_256_10000_1.json", "model3", 2, 0.003) 
-train_model("set_256_10000_1.json", "model4_1", 5, 0.001)
-train_model("set_256_10000_1.json", "model4_2", 5, 0.003)
-train_model("set_256_10000_1.json", "model4_3", 5, 0.006)
+# train_model("set_256_10000_1.json", "model1_1", 0.5, 0.001)
+# train_model("set_256_10000_1.json", "model1_2", 0.5, 0.003)
+# train_model("set_256_10000_1.json", "model1_3", 0.5, 0.006)
+# train_model("set_256_10000_1.json", "model2", 1, 0.003) 
+# train_model("set_256_10000_1.json", "model3", 2, 0.003) 
+# train_model("set_256_10000_1.json", "model4_1", 5, 0.001)
+# train_model("set_256_10000_1.json", "model4_2", 5, 0.003)
+# train_model("set_256_10000_1.json", "model4_3", 5, 0.006) # 0.2508 on 8159/10000 
 
-# train_model("set_256_10000_1.json", "model3")
+models = [
+    "model1_1",
+    "model1_2",
+    "model1_3",
+    "model2",
+    "model3",
+    "model4_1",
+    "model4_2",
+]
+fig, axs = plt.subplots(len(models))
+for i, model_name in enumerate(models):
+    arr = np.loadtxt('C:/dev/' + model_name + "/loss_history.txt", delimiter=",")
+    for i 
+    axs[i].bar(range(0, arr.size), arr)
+fig.tight_layout()
+plt.show()
 
 # xs, ys, errors = load('set_2.json')
 # cnt = 5
