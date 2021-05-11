@@ -92,13 +92,15 @@ def load(name):
         xs.append(entry['decoded'])
         ys.append([entry['value']])
         errors.append([entry['amount_of_errors']])
-
-    # xs = tf.keras.utils.normalize(xs, axis = 0)
-    # ys = tf.keras.utils.normalize(ys, axis = 0)
     xs = np.asarray(xs)
     ys = np.asarray(ys)
 
     return (xs, ys, errors)
+
+def save_metric(history_callback, model_name, metric_name):
+    metric = history_callback.history[metric_name]
+    arr = np.array(metric)
+    np.savetxt('C:/HoloDecoder/models/' + model_name + "/" + metric_name + "_history.txt", arr, delimiter=",")
 
 def train_model(set_name, model_name, k, rate):
     xs, ys, _ = load(set_name)
@@ -111,58 +113,32 @@ def train_model(set_name, model_name, k, rate):
     ys_test = ys[train_set_size:ys.size];
 
     model = tf.keras.Sequential()
-    model.add(tf.keras.layers.Dense(256 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(100 * k, activation=tf.nn.sigmoid))
-    model.add(tf.keras.layers.Dense(50 * k, activation=tf.nn.sigmoid))
+    model.add(tf.keras.layers.Dense(30 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(10 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
-    # As signified by loss = 'mean_squared_error', you are in a regression setting, where accuracy is meaningless (it is meaningful only in classification problems).
     opt = tf.keras.optimizers.Adam(learning_rate=rate)
     model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
-    history_callback = model.fit(xs_train, ys_train, epochs=10000, validation_data=(xs_test, ys_test))
+    history_callback = model.fit(xs_train, ys_train, epochs=5000, validation_data=(xs_test, ys_test), batch_size=64)
 
-    tf.keras.models.save_model(model, 'C:/dev/' + model_name)
-    loss_history = history_callback.history["loss"]
-    numpy_loss_history = np.array(loss_history)
-    np.savetxt('C:/dev/' + model_name + "/loss_history.txt", numpy_loss_history, delimiter=",")
+    tf.keras.models.save_model(model, 'C:/HoloDecoder/models/' + model_name)
+    save_metric(history_callback, model_name, "loss")
+    save_metric(history_callback, model_name, "val_loss")
 
-# generate_set(10000, 256, "set_256_10000_1.json")
-# generate_set(10000, 256, "set_256_10000_2.json")
-# generate_set(5000, 256, "set_256_5000_3.json")
-# generate_set(5000, 256, "set_256_5000_4.json")
-# generate_set(20000, 256, "set_256_20000_5.json")
+def evaluate_model(set_name, model_name):
+    xs, ys, _ = load(set_name)
+    xs = np.asarray(xs)
+    ys = np.asarray(ys)
 
-# train_model("set_256_10000_1.json", "model1_1", 0.5, 0.001)
-# train_model("set_256_10000_1.json", "model1_2", 0.5, 0.003)
-# train_model("set_256_10000_1.json", "model1_3", 0.5, 0.006)
-# train_model("set_256_10000_1.json", "model2", 1, 0.003) 
-# train_model("set_256_10000_1.json", "model3", 2, 0.003) 
-# train_model("set_256_10000_1.json", "model4_1", 5, 0.001)
-# train_model("set_256_10000_1.json", "model4_2", 5, 0.003)
-# train_model("set_256_10000_1.json", "model4_3", 5, 0.006) # 0.2508 on 8159/10000 
+    model = tf.keras.models.load_model('C:/dev/HoloDecoder/models/' + model_name)
+    result = model.evaluate(x=xs, y=ys, use_multiprocessing=True)
 
-models = [
-    "model1_1",
-    "model1_2",
-    "model1_3",
-    "model2",
-    "model3",
-    "model4_1",
-    "model4_2",
-]
-fig, axs = plt.subplots(len(models))
-for i, model_name in enumerate(models):
-    arr = np.loadtxt('C:/dev/' + model_name + "/loss_history.txt", delimiter=",")
-    for i 
-    axs[i].bar(range(0, arr.size), arr)
-fig.tight_layout()
-plt.show()
-
-# xs, ys, errors = load('set_2.json')
-# cnt = 5
-# fig, axs = plt.subplots(cnt)
-# for i in range(cnt):
-#     print("Err: " + str(errors[i][0]) + ' - y: ' + str(ys[i][0]))
-#     axs[i].bar(range(0, xs[i].size), xs[i])
-# fig.tight_layout()
-# plt.show()
+train_model("set_256_20000_1+2.json", "g2_model1_1", 0.5, 0.001)
+train_model("set_256_20000_1+2.json", "g2_model1_2", 0.5, 0.003)
+train_model("set_256_20000_1+2.json", "g2_model1_3", 0.5, 0.006)
+train_model("set_256_20000_1+2.json", "g2_model2_1", 1, 0.001)
+train_model("set_256_20000_1+2.json", "g2_model2_2", 1, 0.003)
+train_model("set_256_20000_1+2.json", "g2_model2_3", 1, 0.006)
+train_model("set_256_20000_1+2.json", "g2_model3_1", 2, 0.001)
+train_model("set_256_20000_1+2.json", "g2_model3_2", 2, 0.003)
+train_model("set_256_20000_1+2.json", "g2_model3_3", 2, 0.006)
