@@ -13,6 +13,24 @@ https://www.kdnuggets.com/2017/10/tensorflow-building-feed-forward-neural-networ
 Handling overfitting in deep learning models:
 https://towardsdatascience.com/handling-overfitting-in-deep-learning-models-c760ee047c6e
 
+# CUDA installation
+
+https://docs.vmware.com/en/VMware-vSphere-Bitfusion/3.0/Example-Guide/GUID-ABB4A0B1-F26E-422E-85C5-BA9F2454363A.html
+
+export DISTRO=ubuntu2004
+export VERSION=11-0-local_11.0.3-450.51.06-1
+export ARCHITECTURE=x86_64
+
+https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu-installation
+sudo dpkg -i cuda-repo-ubuntu2004_11-0-local_11.0.3-450.51.06-1_<architecture>.deb
+sudo apt-key add /var/cuda-repo-ubuntu2004-<version>/7fa2af80.pub
+sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/<architecture>/7fa2af80.pub
+sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/<architecture>/7fa2af80.pub
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/<architecture>/cuda-ubuntu2004.pin
+$ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+sudo apt-get update
+sudo apt-get install cuda
+
 # ANN Generation 1
 
 model1_1    5.24e-03                        0.0949

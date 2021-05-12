@@ -10,6 +10,8 @@ import time
 import signal
 import multiprocessing
 
+path = "/home/radmir/dev/HoloDecoder"
+
 def code(value, obj_size):
     obj_size = 256
     dist_to_hologram = obj_size + 0.5
@@ -76,13 +78,13 @@ def generate_set(set_size, size, name):
         result['amount_of_errors'] = amount_of_errors
         set[i] = result
 
-    with open('C:/dev/' + name, 'w+') as f:
+    with open(path + '/' + name, 'w+') as f:
         json_str = json.dumps(set, indent=4)
         f.write(json_str)
 
 def load(name):
     data = []
-    with open('C:/dev/' + name) as f:
+    with open(path + '/' + name) as f:
         data = json.load(f)
 
     xs = []
@@ -100,7 +102,7 @@ def load(name):
 def save_metric(history_callback, model_name, metric_name):
     metric = history_callback.history[metric_name]
     arr = np.array(metric)
-    np.savetxt('C:/HoloDecoder/models/' + model_name + "/" + metric_name + "_history.txt", arr, delimiter=",")
+    np.savetxt(path + '/models/' + model_name + "/" + metric_name + "_history.txt", arr, delimiter=",")
 
 def train_model(set_name, model_name, k, rate):
     xs, ys, _ = load(set_name)
@@ -121,7 +123,7 @@ def train_model(set_name, model_name, k, rate):
     model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
     history_callback = model.fit(xs_train, ys_train, epochs=5000, validation_data=(xs_test, ys_test), batch_size=64)
 
-    tf.keras.models.save_model(model, 'C:/HoloDecoder/models/' + model_name)
+    tf.keras.models.save_model(model, path + '/models/' + model_name)
     save_metric(history_callback, model_name, "loss")
     save_metric(history_callback, model_name, "val_loss")
 
@@ -130,11 +132,36 @@ def evaluate_model(set_name, model_name):
     xs = np.asarray(xs)
     ys = np.asarray(ys)
 
-    model = tf.keras.models.load_model('C:/dev/HoloDecoder/models/' + model_name)
+    model = tf.keras.models.load_model(path + '/models/' + model_name)
     result = model.evaluate(x=xs, y=ys, use_multiprocessing=True)
 
-generate_set(10000, 256, "set_256_5000_5.json")
-generate_set(10000, 256, "set_256_5000_6.json")
+def show_losses(models):
+    fig, axs = plt.subplots(len(models))
+    for i, model_name in enumerate(models):
+        loss = np.loadtxt(path + '/models/' + model_name + "/loss_history.txt", delimiter=",")
+        val_loss = np.loadtxt(path + '/models/' + model_name + "/val_loss_history.txt", delimiter=",")
+        x = range(0, loss.size)
+        axs[i].plot(x, loss, color="blue")
+        axs[i].plot(x, val_loss, color="red")
+    fig.tight_layout()
+    plt.show()
+
+g2_models = [
+    "g2_model1_1",
+    "g2_model1_2",
+    "g2_model1_3",
+    # "g2_model2_1",
+    # "g2_model2_2",
+    # "g2_model2_3",
+    "g2_model3_1",
+    "g2_model3_2",
+    "g2_model3_3"
+]
+
+show_losses(g2_models)
+
+# generate_set(10000, 256, "set_256_5000_5.json")
+# generate_set(10000, 256, "set_256_5000_6.json")
 
 # train_model("set_256_20000_1+2.json", "g2_model1_1", 0.5, 0.001)
 # train_model("set_256_20000_1+2.json", "g2_model1_2", 0.5, 0.003)
