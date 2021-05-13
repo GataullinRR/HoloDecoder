@@ -52,3 +52,24 @@ train_model("set_256_10000_1.json", "model4_2", 5, 0.003)
 Conclusions:
 1) 250 epoch is enough for fast evaluation
 2) Even 128-50-25-5 is too large (or the set is too small)
+
+# ANN Generation 2
+
+Set size        20000
+Range of errors 0:1
+
+Lowest error    g2_model3_3
+architecture    200-60-20 
+rate            0.006
+loss            0.004
+val_loss        0.069 ( 17.7 )
+
+smallest NN     g2_model1_1
+architecture    50-15-5 
+rate            0.001
+loss            0.036
+val_loss        0.095 ( 24.3 )
+
+Conclusions:
+1) More than 2000 epoch is not viable for training since after tahat threshold NN is no longer training. The higher size of NN the higher the effect
+2) Better training set is required

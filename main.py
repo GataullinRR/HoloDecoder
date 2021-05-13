@@ -135,16 +135,30 @@ def evaluate_model(set_name, model_name):
     model = tf.keras.models.load_model(path + '/models/' + model_name)
     result = model.evaluate(x=xs, y=ys, use_multiprocessing=True)
 
+figure_idx = 0
+
 def show_losses(models):
+    global figure_idx
+    figure_idx = figure_idx + 1
+    plt.figure(figure_idx)
     fig, axs = plt.subplots(len(models))
     for i, model_name in enumerate(models):
         loss = np.loadtxt(path + '/models/' + model_name + "/loss_history.txt", delimiter=",")
         val_loss = np.loadtxt(path + '/models/' + model_name + "/val_loss_history.txt", delimiter=",")
         x = range(0, loss.size)
+        axs[i].set_title(f'{model_name} loss.min: {round(loss.min(), 3)} val_loss.min: {round(val_loss.min(), 3)}')
         axs[i].plot(x, loss, color="blue")
         axs[i].plot(x, val_loss, color="red")
+        axs[i].legend(['loss', 'val_loss'])
+        axs[i].set_xlabel('Epoch')
+        axs[i].set_ylabel('Metric')
     fig.tight_layout()
-    plt.show()
+
+def run_in_new_process(func):
+    if __name__ == '__main__':
+        p1 = multiprocessing.Process(target=func)
+        p1.start()
+        p1.join()
 
 g2_models = [
     "g2_model1_1",
@@ -158,17 +172,36 @@ g2_models = [
     "g2_model3_3"
 ]
 
-show_losses(g2_models)
+show_losses([
+    "g2_model1_1",
+    "g2_model2_1",
+    "g2_model3_1"
+])
 
-# generate_set(10000, 256, "set_256_5000_5.json")
-# generate_set(10000, 256, "set_256_5000_6.json")
+show_losses([
+    "g2_model1_2",
+    "g2_model2_2",
+    "g2_model3_2"
+])
 
-# train_model("set_256_20000_1+2.json", "g2_model1_1", 0.5, 0.001)
-# train_model("set_256_20000_1+2.json", "g2_model1_2", 0.5, 0.003)
-# train_model("set_256_20000_1+2.json", "g2_model1_3", 0.5, 0.006)
-# train_model("set_256_20000_1+2.json", "g2_model2_1", 1, 0.001)
-# train_model("set_256_20000_1+2.json", "g2_model2_2", 1, 0.003)
-# train_model("set_256_20000_1+2.json", "g2_model2_3", 1, 0.006)
-# train_model("set_256_20000_1+2.json", "g2_model3_1", 2, 0.001)
-# train_model("set_256_20000_1+2.json", "g2_model3_2", 2, 0.003)
-# train_model("set_256_20000_1+2.json", "g2_model3_3", 2, 0.006)
+show_losses([
+    "g2_model1_3",
+    "g2_model2_3",
+    "g2_model3_3"
+])
+
+plt.show()
+
+
+# generate_set(10000, 256, "set_256_10000_5.json")
+# generate_set(10000, 256, "set_256_10000_6.json")
+
+# train_model("set_256_20000_1+2.json", "g2'_model1_1", 0.5, 0.001)
+# train_model("set_256_20000_1+2.json", "g2'_model1_2", 0.5, 0.003)
+# train_model("set_256_20000_1+2.json", "g2'_model1_3", 0.5, 0.006)
+# train_model("set_256_20000_1+2.json", "g2'_model2_1", 1, 0.001)
+# train_model("set_256_20000_1+2.json", "g2'_model2_2", 1, 0.003)
+# train_model("set_256_20000_1+2.json", "g2'_model2_3", 1, 0.006)
+# train_model("set_256_20000_1+2.json", "g2'_model3_1", 2, 0.001)
+# train_model("set_256_20000_1+2.json", "g2'_model3_2", 2, 0.003)
+# train_model("set_256_20000_1+2.json", "g2'_model3_3", 2, 0.006)
