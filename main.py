@@ -109,15 +109,15 @@ def save_metric(history_callback, model_name, metric_name):
     arr = np.array(metric)
     np.savetxt(f'{path}/models/{model_name}/{metric_name}_history.txt', arr, delimiter=",")
 
-def train_model(set_name, model_name, epoch_count, k, rate):
-    xs, ys, _ = load(set_name)
+def train_model(set, model_name, epoch_count, k, rate):
+    xs, ys, _ = set
     xs = np.asarray(xs)
     ys = np.asarray(ys)
-    train_set_size = int(fix(ys.size * 0.8))
-    xs_train = xs[1:train_set_size];
-    ys_train = ys[1:train_set_size];
-    xs_test = xs[train_set_size:ys.size];
-    ys_test = ys[train_set_size:ys.size];
+    # train_set_size = int(fix(ys.size * 0.8))
+    # xs_train = xs[1:train_set_size];
+    # ys_train = ys[1:train_set_size];
+    # xs_test = xs[train_set_size:ys.size];
+    # ys_test = ys[train_set_size:ys.size];
 
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(100 * k, activation=tf.nn.sigmoid))
@@ -126,7 +126,7 @@ def train_model(set_name, model_name, epoch_count, k, rate):
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
     opt = tf.keras.optimizers.Adam(learning_rate=rate)
     model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
-    history_callback = model.fit(xs_train, ys_train, epochs=epoch_count, validation_data=(xs_test, ys_test), batch_size=64)
+    history_callback = model.fit(xs, ys, epochs=epoch_count, batch_size=64, validation_split = 0.2)
 
     tf.keras.models.save_model(model, path + '/models/' + model_name)
     save_metric(history_callback, model_name, "loss")
@@ -218,23 +218,34 @@ def concat_sets(sets, resulting_set):
 def generate_sets(index, size, entries_count, workers):
     processes = []
     for i in range(0, workers):
-        processes.append(run_in_new_process(generate_set, (entries_count, size, f"v2_set_{size}_{entries_count}_{index}.pickle")))
+        processes.append(run_in_new_process(generate_set, (entries_count, size, f"v2_0_1_set_{size}_{entries_count}_{index}.pickle")))
         index += 1
     for p in processes:
         p.join()   
 
-def show_results(set_name, model):
+def show_results(set_name, offset, model):
     set = load(set_name)
-    print_data(set, [1, 2, 3, 4], model)
+    print_data(set, [i + offset for i in [1, 2, 3, 4]], model)
     plt.show()
 
 def show_losses_macro():
     show_losses(["g3_model1_1", "g3_model2_1", "g3_model3_1"])
     show_losses(["g3_model1_2", "g3_model2_2", "g3_model3_2"])
     show_losses(["g3_model1_3", "g3_model2_3", "g3_model3_3"])
-    show_losses(["g3_model1_4", "g3_model2_4", "g3_model3_4"])
-    show_losses(["g3_model3_1", "g3_model3_3", "g3_model3_6", "g3_model3_8"])
     plt.show()
+
+
+# processes = []
+# set = load("v2_0_1_set_256_10000_13.pickle")
+# epochs = 1000
+# processes.append(run_in_new_process(train_model, (set, "g0_model1_1", epochs, 0.5, 0.001)))
+# for p in processes:
+#     p.join()
+
+# show_losses(["g0_model1_1", "g0_model1_1"])
+# plt.show()
+    
+# generate_sets(13, 256, 10000, 6)
 
 # x = range(0, 256)
 # message = code(100, 256)
@@ -268,13 +279,11 @@ def show_losses_macro():
 # axs[4].bar(x, normalize(d_100), color="black")
 # plt.show()
 
-
-# generate_sets(13, 256, 10, 3)
-
-
+# generate_sets(index=19, size=256, entries_count=50, workers=1)
 
 # show_losses_macro()
-# show_results("v2_set_256_10_14.pickle", "g3_model3_1")
+# show_results("v2_0_1_set_256_50_19.pickle", 0, "g3_model3_1")
+# show_results("v2_0_1_set_256_10000_18.pickle", "g3_model3_3")
 # show_results("v2_set_256_100_14.pickle", "g3_model3_1")
 # show_results("v2_set_256_100_15.pickle", "g3_model3_1")
 
@@ -288,30 +297,24 @@ def show_losses_macro():
 # ],
 # "v2_set_256_60000_1-6.pickle")
 
-# a = [1, -1.2, 3, 9, 0, -10]
-# print(a)
-# print(np.pad(a, (2, 2), 'linear_ramp', end_values=(-1, 1)))
-# print(tf.keras.utils.normalize(a))
-# print(tf.keras.utils.normalize(a, order=2))
-# print(tf.keras.utils.normalize(a, order=1))
-# print(tf.keras.utils.normalize(a, order=0))
-# a = 2.0 * (a - np.min(a)) / np.ptp(a) - 1
-# print(a)
 
 
-# train_model("v2_set_256_60000_1-6.pickle", "g3_model1_1", 3000, 0.5, 0.001)
 
 # processes = []
-# set_name = "v2_set_256_60000_1-6.pickle"
+# set = load("v2_0_1_set_256_60000_13-18.pickle")
 # epochs = 3000
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_1", epochs, 0.5, 0.001)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_2", epochs, 0.5, 0.003)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_3", epochs, 0.5, 0.006)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_4", epochs, 0.5, 0.012)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_1", epochs, 1, 0.001)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_2", epochs, 1, 0.003)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_3", epochs, 1, 0.006)))
-# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_4", epochs, 1, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model1_1", epochs, 0.5, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model1_2", epochs, 0.5, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model1_3", epochs, 0.5, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model1_4", epochs, 0.5, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model2_1", epochs, 1, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model2_2", epochs, 1, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model2_3", epochs, 1, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model2_4", epochs, 1, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model3_1", epochs, 2, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model3_2", epochs, 2, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3_model3_3", epochs, 2, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model3_4", epochs, 2, 0.012)))
 # for p in processes:
 #     p.join()
 
@@ -326,5 +329,10 @@ def show_losses_macro():
 # processes.append(run_in_new_process(train_model, (set_name, "g3_model3_6", epochs, 2, 0.048)))
 # processes.append(run_in_new_process(train_model, (set_name, "g3_model3_7", epochs, 2, 0.096)))
 # processes.append(run_in_new_process(train_model, (set_name, "g3_model3_8", epochs, 2, 0.192)))
+# for p in processes:
+#     p.join()processes = []
+# set = load("v2_0_1_set_256_10000_13.pickle")
+# epochs = 1000
+# processes.append(run_in_new_process(train_model, (set, "g0_model1_1", epochs, 0.5, 0.001)))
 # for p in processes:
 #     p.join()
