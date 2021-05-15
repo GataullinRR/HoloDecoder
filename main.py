@@ -9,6 +9,7 @@ import pandas as pd
 import time
 import signal
 import multiprocessing
+import pickle
 
 path = "/home/radmir/dev/HoloDecoder"
 
@@ -39,7 +40,6 @@ def decode(msg, obj_size):
     F = msg
     FInv = [0] * N
     Sl = [0] * N
-    SInvl = [0] * N
     for i in range(0, N):
         FInv[i] = 1 - F[i]
         for j in range(0, N):
@@ -48,8 +48,6 @@ def decode(msg, obj_size):
             Rcos = np.cos((L / w - np.fix(L / w)) / w * 2 * np.pi)
             R = F[i] * Rcos
             Sl[j] = Sl[j] + R
-            RInv = FInv[i] * Rcos
-            SInvl[j] = SInvl[j] + RInv
     return Sl
 
 def add_random_noise(message, obj_size, error_percent):
@@ -58,34 +56,41 @@ def add_random_noise(message, obj_size, error_percent):
     indexes = random.choice(obj_size, size=(errors), replace=False)
 
     for index in indexes:
-        message_with_errors[index] = 1 if message_with_errors[index] == 0 else 1
+        message_with_errors[index] = 1 if message_with_errors[index] == 0 else 0
     return message_with_errors
+
+def normalize(list):
+    norm_coef = (1 / max(abs(max(list)), abs(min(list))))
+    return (np.array(list) * norm_coef).tolist()
 
 def generate_set(set_size, size, name):
     set = [0] * set_size
     values = np.random.bytes(set_size)
     for i in range(0, set_size):
+        print(i)
         value = values[i]
         amount_of_errors = random.randint(0, 100) / 100
-
         message = code(value, size)
         message_with_errors = add_random_noise(message, size, amount_of_errors);
         decoded_message_with_errors = decode(message_with_errors, size)
 
         result = {}
-        result['value'] = value / 256
-        result['decoded'] = tf.keras.utils.normalize(decoded_message_with_errors)[0].tolist()
+        result['value'] = value / 255
+        result['discrete'] = message_with_errors
+        result['discrete_without_errors'] = message
+        result['decoded'] = normalize(decoded_message_with_errors)
+        result['decoded_non_normalized'] = decoded_message_with_errors
         result['amount_of_errors'] = amount_of_errors
+
         set[i] = result
 
-    with open(path + '/' + name, 'w+') as f:
-        json_str = json.dumps(set, indent=4)
-        f.write(json_str)
+    with open(f'{path}/data/{name}', 'w+b') as f:
+        pickle.dump(set, f)
 
 def load(name):
     data = []
-    with open(path + '/' + name) as f:
-        data = json.load(f)
+    with open(f'{path}/data/{name}', 'rb') as f:
+        data = pickle.load(f)
 
     xs = []
     ys = []
@@ -102,9 +107,9 @@ def load(name):
 def save_metric(history_callback, model_name, metric_name):
     metric = history_callback.history[metric_name]
     arr = np.array(metric)
-    np.savetxt(path + '/models/' + model_name + "/" + metric_name + "_history.txt", arr, delimiter=",")
+    np.savetxt(f'{path}/models/{model_name}/{metric_name}_history.txt', arr, delimiter=",")
 
-def train_model(set_name, model_name, k, rate):
+def train_model(set_name, model_name, epoch_count, k, rate):
     xs, ys, _ = load(set_name)
     xs = np.asarray(xs)
     ys = np.asarray(ys)
@@ -121,7 +126,7 @@ def train_model(set_name, model_name, k, rate):
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
     opt = tf.keras.optimizers.Adam(learning_rate=rate)
     model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
-    history_callback = model.fit(xs_train, ys_train, epochs=5000, validation_data=(xs_test, ys_test), batch_size=64)
+    history_callback = model.fit(xs_train, ys_train, epochs=epoch_count, validation_data=(xs_test, ys_test), batch_size=64)
 
     tf.keras.models.save_model(model, path + '/models/' + model_name)
     save_metric(history_callback, model_name, "loss")
@@ -143,8 +148,8 @@ def show_losses(models):
     plt.figure(figure_idx)
     fig, axs = plt.subplots(len(models))
     for i, model_name in enumerate(models):
-        loss = np.loadtxt(path + '/models/' + model_name + "/loss_history.txt", delimiter=",")
-        val_loss = np.loadtxt(path + '/models/' + model_name + "/val_loss_history.txt", delimiter=",")
+        loss = np.loadtxt(f"{path}/models/{model_name}/loss_history.txt", delimiter=",")
+        val_loss = np.loadtxt(f"{path}/models/{model_name}/val_loss_history.txt", delimiter=",")
         x = range(0, loss.size)
         axs[i].set_title(f'{model_name} loss.min: {round(loss.min(), 3)} val_loss.min: {round(val_loss.min(), 3)}')
         axs[i].plot(x, loss, color="blue")
@@ -154,54 +159,172 @@ def show_losses(models):
         axs[i].set_ylabel('Metric')
     fig.tight_layout()
 
-def run_in_new_process(func):
+def run_in_new_process(func, a):
     if __name__ == '__main__':
-        p1 = multiprocessing.Process(target=func)
+        p1 = multiprocessing.Process(target=func, args=a)
         p1.start()
-        p1.join()
+        return p1
 
-g2_models = [
-    "g2_model1_1",
-    "g2_model1_2",
-    "g2_model1_3",
-    # "g2_model2_1",
-    # "g2_model2_2",
-    # "g2_model2_3",
-    "g2_model3_1",
-    "g2_model3_2",
-    "g2_model3_3"
-]
+def print_data(set, idx, eval_model):
+    model = tf.keras.models.load_model(f'{path}/models/{eval_model}')
+    global figure_idx
+    figure_idx = figure_idx + 1    
+    plt.figure(figure_idx)
+    fig, axs = plt.subplots(len(idx))
+    for i, set_index in enumerate(idx):
+        (xs, ys, errors) = set
+        point_xs = xs[set_index]
+        point_ys = ys[set_index]
+        l = []
+        l.append(point_xs)
+        l = np.array(l)
+        k = []
+        k.append(point_ys)
+        k = np.array(k)
+        result = model.evaluate(x=l, y=k)
+        predicted = round((model.predict(x=l)[0][0] * 255))
 
-show_losses([
-    "g2_model1_1",
-    "g2_model2_1",
-    "g2_model3_1"
-])
+        x = range(0, point_xs.size)
+        axs[i].set_title(f'index: {set_index} error: {round(errors[set_index][0], 2)} value: {point_ys[0] * 255} ({predicted}) loss({eval_model}): {round(result[0], 3)}' )
+        axs[i].bar(x, point_xs, color="blue")
+        axs[i].legend(['x'])
+        axs[i].set_xlabel('Sample')
+        axs[i].set_ylabel('Value')
+    fig.tight_layout()
 
-show_losses([
-    "g2_model1_2",
-    "g2_model2_2",
-    "g2_model3_2"
-])
+def show_coded_and_decoded():
+    x = range(0, 256)
+    codes   = [code(255, 256), code(0, 256), code(100, 256)]
+    decoded = [decode(codes[0], 256), decode(codes[1], 256), decode(codes[2], 256)]
+    fig, axs = plt.subplots(6)
+    axs[0].bar(x, codes[0])
+    axs[1].bar(x, decoded[0])
+    axs[2].bar(x, codes[1])
+    axs[3].bar(x, decoded[1])
+    axs[4].bar(x, codes[2])
+    axs[5].bar(x, decoded[2])
+    fig.tight_layout()
+    plt.show()
 
-show_losses([
-    "g2_model1_3",
-    "g2_model2_3",
-    "g2_model3_3"
-])
+def concat_sets(sets, resulting_set):
+    data = []
+    for set in sets:
+        with open(f'{path}/data/{set}', 'rb') as f:
+            data.append(pickle.load(f))
+    data = [item for sublist in data for item in sublist]
+    with open(f'{path}/data/{resulting_set}', 'w+b') as f:
+        pickle.dump(data, f)        
 
-plt.show()
+def generate_sets(index, size, entries_count, workers):
+    processes = []
+    for i in range(0, workers):
+        processes.append(run_in_new_process(generate_set, (entries_count, size, f"v2_set_{size}_{entries_count}_{index}.pickle")))
+        index += 1
+    for p in processes:
+        p.join()   
+
+def show_results(set_name, model):
+    set = load(set_name)
+    print_data(set, [1, 2, 3, 4], model)
+    plt.show()
+
+def show_losses_macro():
+    show_losses(["g3_model1_1", "g3_model2_1", "g3_model3_1"])
+    show_losses(["g3_model1_2", "g3_model2_2", "g3_model3_2"])
+    show_losses(["g3_model1_3", "g3_model2_3", "g3_model3_3"])
+    show_losses(["g3_model1_4", "g3_model2_4", "g3_model3_4"])
+    show_losses(["g3_model3_1", "g3_model3_3", "g3_model3_6", "g3_model3_8"])
+    plt.show()
+
+# x = range(0, 256)
+# message = code(100, 256)
+# w_err_0 = add_random_noise(message, 256, 0)
+# w_err_25 = add_random_noise(message, 256, 0.25)
+# w_err_50 = add_random_noise(message, 256, 0.5)
+# w_err_75 = add_random_noise(message, 256, 0.75)
+# w_err_100 = add_random_noise(message, 256, 1)
+# # fig, axs = plt.subplots(5)
+# # axs[0].bar(x, w_err_0, color="black")
+# # axs[1].bar(x, w_err_25, color="black")
+# # axs[2].bar(x, w_err_50, color="black")
+# # axs[3].bar(x, w_err_75, color="black")
+# # axs[4].bar(x, w_err_100, color="black")
+
+# d_0 = decode(w_err_0, 256)
+# d_25 = decode(w_err_25, 256)
+# d_50 = decode(w_err_50, 256)
+# d_75 = decode(w_err_75, 256)
+# d_100 = decode(w_err_100, 256)
+# fig, axs = plt.subplots(5)
+# # axs[0].bar(x, d_0, color="black")
+# # axs[1].bar(x, d_25, color="black")
+# # axs[2].bar(x, d_50, color="black")
+# # axs[3].bar(x, d_75, color="black")
+# # axs[4].bar(x, d_100, color="black")
+# axs[0].bar(x, normalize(d_0), color="black")
+# axs[1].bar(x, normalize(d_25), color="black")
+# axs[2].bar(x, normalize(d_50), color="black")
+# axs[3].bar(x, normalize(d_75), color="black")
+# axs[4].bar(x, normalize(d_100), color="black")
+# plt.show()
 
 
-# generate_set(10000, 256, "set_256_10000_5.json")
-# generate_set(10000, 256, "set_256_10000_6.json")
+# generate_sets(13, 256, 10, 3)
 
-# train_model("set_256_20000_1+2.json", "g2'_model1_1", 0.5, 0.001)
-# train_model("set_256_20000_1+2.json", "g2'_model1_2", 0.5, 0.003)
-# train_model("set_256_20000_1+2.json", "g2'_model1_3", 0.5, 0.006)
-# train_model("set_256_20000_1+2.json", "g2'_model2_1", 1, 0.001)
-# train_model("set_256_20000_1+2.json", "g2'_model2_2", 1, 0.003)
-# train_model("set_256_20000_1+2.json", "g2'_model2_3", 1, 0.006)
-# train_model("set_256_20000_1+2.json", "g2'_model3_1", 2, 0.001)
-# train_model("set_256_20000_1+2.json", "g2'_model3_2", 2, 0.003)
-# train_model("set_256_20000_1+2.json", "g2'_model3_3", 2, 0.006)
+
+
+# show_losses_macro()
+# show_results("v2_set_256_10_14.pickle", "g3_model3_1")
+# show_results("v2_set_256_100_14.pickle", "g3_model3_1")
+# show_results("v2_set_256_100_15.pickle", "g3_model3_1")
+
+# concat_sets([
+#     "v2_set_256_10000_1.pickle",
+#     "v2_set_256_10000_2.pickle",
+#     "v2_set_256_10000_3.pickle",
+#     "v2_set_256_10000_4.pickle",
+#     "v2_set_256_10000_5.pickle",
+#     "v2_set_256_10000_6.pickle"
+# ],
+# "v2_set_256_60000_1-6.pickle")
+
+# a = [1, -1.2, 3, 9, 0, -10]
+# print(a)
+# print(np.pad(a, (2, 2), 'linear_ramp', end_values=(-1, 1)))
+# print(tf.keras.utils.normalize(a))
+# print(tf.keras.utils.normalize(a, order=2))
+# print(tf.keras.utils.normalize(a, order=1))
+# print(tf.keras.utils.normalize(a, order=0))
+# a = 2.0 * (a - np.min(a)) / np.ptp(a) - 1
+# print(a)
+
+
+# train_model("v2_set_256_60000_1-6.pickle", "g3_model1_1", 3000, 0.5, 0.001)
+
+# processes = []
+# set_name = "v2_set_256_60000_1-6.pickle"
+# epochs = 3000
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_1", epochs, 0.5, 0.001)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_2", epochs, 0.5, 0.003)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_3", epochs, 0.5, 0.006)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model1_4", epochs, 0.5, 0.012)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_1", epochs, 1, 0.001)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_2", epochs, 1, 0.003)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_3", epochs, 1, 0.006)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model2_4", epochs, 1, 0.012)))
+# for p in processes:
+#     p.join()
+
+# processes = []
+# set_name = "v2_set_256_60000_1-6.pickle"
+# epochs = 3000
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_1", epochs, 2, 0.001)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_2", epochs, 2, 0.003)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_3", epochs, 2, 0.006)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_4", epochs, 2, 0.012)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_5", epochs, 2, 0.024)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_6", epochs, 2, 0.048)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_7", epochs, 2, 0.096)))
+# processes.append(run_in_new_process(train_model, (set_name, "g3_model3_8", epochs, 2, 0.192)))
+# for p in processes:
+#     p.join()

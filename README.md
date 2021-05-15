@@ -31,6 +31,9 @@ $ sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
 sudo apt-get update
 sudo apt-get install cuda
 
+Fourier transformation using ANN:
+https://gist.github.com/endolith/98863221204541bf017b6cae71cb0a89
+
 # ANN Generation 1
 
 model1_1    5.24e-03                        0.0949
@@ -57,6 +60,7 @@ Conclusions:
 
 Set size        20000
 Range of errors 0:1
+Batch size      64
 
 Lowest error    g2_model3_3
 architecture    200-60-20 
@@ -64,7 +68,7 @@ rate            0.006
 loss            0.004
 val_loss        0.069 ( 17.7 )
 
-smallest NN     g2_model1_1
+Smallest NN     g2_model1_1
 architecture    50-15-5 
 rate            0.001
 loss            0.036
@@ -73,3 +77,15 @@ val_loss        0.095 ( 24.3 )
 Conclusions:
 1) More than 2000 epoch is not viable for training since after tahat threshold NN is no longer training. The higher size of NN the higher the effect
 2) Better training set is required
+
+# ANN Generation 3
+
+Set size        40000
+Range of errors 0:1
+Batch size      64
+
+Observations:
+1) 100-30-10 and bigger ANN show increase in val_loss over time (~after 500 epoch)
+
+Conclusions:
+1) Big nn 
