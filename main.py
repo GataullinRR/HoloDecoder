@@ -98,7 +98,7 @@ def generate_set(set_size, size, name):
     with open(f'{path}/data/{name}', 'w+b') as f:
         pickle.dump(set, f)
 
-def load(name):
+def load(name, x_entries):
     data = []
     with open(f'{path}/data/{name}', 'rb') as f:
         data = pickle.load(f)
@@ -107,7 +107,7 @@ def load(name):
     ys = []
     errors = []
     for entry in data:
-        xs.append(entry['decoded'])
+        xs.append(entry[x_entries])
         ys.append([entry['value']])
         errors.append([entry['amount_of_errors']])
     xs = np.asarray(xs)
@@ -238,13 +238,13 @@ def show_results(set_name, offset, model):
     plt.show()
 
 def show_losses_macro():
-    show_losses(["g3_model1_1", "g3_model2_1", "g3_model3_1"])
-    show_losses(["g3_model1_2", "g3_model2_2", "g3_model3_2"])
-    show_losses(["g3_model1_3", "g3_model2_3", "g3_model3_3"])
-    # show_losses(["g3_model1_4", "g3_model2_4", "g3_model3_4"])
+    show_losses(["g3'_model1_1", "g3'_model2_1", "g3'_model3_1"])
+    show_losses(["g3'_model1_2", "g3'_model2_2", "g3'_model3_2"])
+    show_losses(["g3'_model1_3", "g3'_model2_3", "g3'_model3_3"])
+    # show_losses(["g3'_model1_4", "g3'_model2_4", "g3'_model3_4"])
     plt.show()
 
-show_losses_macro();
+# show_losses_macro();
 
 # processes = []
 # set = load("v2_0_1_set_256_10000_13.pickle")
@@ -306,7 +306,7 @@ show_losses_macro();
 # axs[3].bar(x, m4, color="black")
 # plt.show()
 
-# show_losses_macro()
+show_losses_macro()
 # show_results("v2_0_1_set_256_60000_13-18.pickle", 000, "g3_model3_1")
 # show_results("v2_0_1_set_256_10000_20.pickle", 000, "g3_model3_1")
 # show_results("v2_0_1_set_256_10000_18.pickle", "g3_model3_3")
@@ -326,20 +326,20 @@ show_losses_macro();
 # generate_sets(index=1, size=256, entries_count=10000, workers=6)
 
 # processes = []
-# set = load("v2_0_1_set_256_10000_1-6.pickle")
+# set = load("v2_0_1_set_256_10000_1-6.pickle", "discrete")
 # epochs = 500
-# processes.append(run_in_new_process(train_model, (set, "g3_model1_1", epochs, 0.5, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model1_2", epochs, 0.5, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model1_3", epochs, 0.5, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3_model1_4", epochs, 0.5, 0.012)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model2_1", epochs, 1, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model2_2", epochs, 1, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model2_3", epochs, 1, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3_model2_4", epochs, 1, 0.012)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model3_1", epochs, 2, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model3_2", epochs, 2, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model3_3", epochs, 2, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3_model3_4", epochs, 2, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model1_1", epochs, 0.5, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model1_2", epochs, 0.5, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model1_3", epochs, 0.5, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3'model1_4", epochs, 0.5, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model2_1", epochs, 1, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model2_2", epochs, 1, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model2_3", epochs, 1, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3'model2_4", epochs, 1, 0.012)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model3_1", epochs, 2, 0.001)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model3_2", epochs, 2, 0.003)))
+# processes.append(run_in_new_process(train_model, (set, "g3'_model3_3", epochs, 2, 0.006)))
+# # processes.append(run_in_new_process(train_model, (set, "g3'model3_4", epochs, 2, 0.012)))
 # for p in processes:
 #     p.join()
 
