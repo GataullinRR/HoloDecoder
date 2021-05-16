@@ -78,14 +78,34 @@ Conclusions:
 1) More than 2000 epoch is not viable for training since after tahat threshold NN is no longer training. The higher size of NN the higher the effect
 2) Better training set is required
 
-# ANN Generation 3
+# ANN Generation 3 (many programm erros were fixed here)
 
-Set size        40000
+Set size        60000
 Range of errors 0:1
 Batch size      64
 
+Lowest error    g3_model3_3
+architecture    200-60-20
+rate            0.006
+loss            0.013 
+val_loss        0.118 ( 30.7 )
+
+Smallest NN     g3_model1_3
+architecture    50-15-5 
+rate            0.006
+loss            0.014
+val_loss        0.13 ( 33.3 )
+
 Observations:
-1) 100-30-10 and bigger ANN show increase in val_loss over time (~after 500 epoch)
+1) All NN show increase in val_loss after 50 iteration. In small NN with high learning rate 0.006 the loss begins to drop after 200 epochs
+2) Huge overfitting from the very beginning
 
 Conclusions:
-1) Big nn 
+1) Early slopping is not viable option due to (2)
+
+Ideas:
+1) Increase set size
+2) Try Droppout/Regularization
+3) Make model simplier
+4) Remove errors in range [0.45;0.55] (those are almoust 100% noise)
+5) Try training on discrete input

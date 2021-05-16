@@ -241,10 +241,10 @@ def show_losses_macro():
     show_losses(["g3_model1_1", "g3_model2_1", "g3_model3_1"])
     show_losses(["g3_model1_2", "g3_model2_2", "g3_model3_2"])
     show_losses(["g3_model1_3", "g3_model2_3", "g3_model3_3"])
-    show_losses(["g3_model1_4", "g3_model2_4", "g3_model3_4"])
+    # show_losses(["g3_model1_4", "g3_model2_4", "g3_model3_4"])
     plt.show()
 
-# show_losses_macro();
+show_losses_macro();
 
 # processes = []
 # set = load("v2_0_1_set_256_10000_13.pickle")
@@ -291,13 +291,13 @@ def show_losses_macro():
 # generate_sets(index=35, size=256, entries_count=10, workers=4)
 
 # x = range(0, 256)
-# (xs, ys, _)  = load("v2_0_1_set_256_10_35.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10000_1.pickle")
 # m1 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10_36.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10000_2.pickle")
 # m2 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10_37.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10000_3.pickle")
 # m3 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10_38.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10000_4.pickle")
 # m4 = xs[0]
 # fig, axs = plt.subplots(4)
 # axs[0].bar(x, m1, color="black")
@@ -314,32 +314,32 @@ def show_losses_macro():
 # show_results("v2_set_256_100_15.pickle", "g3_model3_1")
 
 # concat_sets([
-#     "v2_set_256_10000_1.pickle",
-#     "v2_set_256_10000_2.pickle",
-#     "v2_set_256_10000_3.pickle",
-#     "v2_set_256_10000_4.pickle",
-#     "v2_set_256_10000_5.pickle",
-#     "v2_set_256_10000_6.pickle"
+#     "v2_0_1_set_256_10000_1.pickle",
+#     "v2_0_1_set_256_10000_2.pickle",
+#     "v2_0_1_set_256_10000_3.pickle",
+#     "v2_0_1_set_256_10000_4.pickle",
+#     "v2_0_1_set_256_10000_5.pickle",
+#     "v2_0_1_set_256_10000_6.pickle"
 # ],
-# "v2_set_256_60000_1-6.pickle")
+# "v2_0_1_set_256_10000_1-6.pickle")
 
-# generate_sets(index=20, size=256, entries_count=10000, workers=9)
+# generate_sets(index=1, size=256, entries_count=10000, workers=6)
 
 # processes = []
-# set = load("v2_0_1_set_256_60000_13-18.pickle")
-# epochs = 3000
+# set = load("v2_0_1_set_256_10000_1-6.pickle")
+# epochs = 500
 # processes.append(run_in_new_process(train_model, (set, "g3_model1_1", epochs, 0.5, 0.001)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model1_2", epochs, 0.5, 0.003)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model1_3", epochs, 0.5, 0.006)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model1_4", epochs, 0.5, 0.012)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model1_4", epochs, 0.5, 0.012)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model2_1", epochs, 1, 0.001)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model2_2", epochs, 1, 0.003)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model2_3", epochs, 1, 0.006)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model2_4", epochs, 1, 0.012)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model2_4", epochs, 1, 0.012)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model3_1", epochs, 2, 0.001)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model3_2", epochs, 2, 0.003)))
 # processes.append(run_in_new_process(train_model, (set, "g3_model3_3", epochs, 2, 0.006)))
-# processes.append(run_in_new_process(train_model, (set, "g3_model3_4", epochs, 2, 0.012)))
+# # processes.append(run_in_new_process(train_model, (set, "g3_model3_4", epochs, 2, 0.012)))
 # for p in processes:
 #     p.join()
 
