@@ -71,16 +71,19 @@ def normalize(list):
     norm_coef = (1 / max(abs(max(list)), abs(min(list))))
     return (np.array(list) * norm_coef).tolist()
 
-def generate_set(set_size, size, name):
+def generate_set(set_size, range_of_excluded_errors, size, name):
     initialize_random()
 
     set = [0] * set_size
     values = random.bytes(set_size)
-    print(values)
     for i in range(0, set_size):
         print(i)
         value = values[i]
-        amount_of_errors = random.randint(0, 100) / 100
+        
+        amount_of_errors = range_of_excluded_errors[0]
+        while amount_of_errors <= range_of_excluded_errors[1] and amount_of_errors >= range_of_excluded_errors[0]:
+            amount_of_errors = random.randint(0, 100) / 100
+
         message = code(value, size)
         message_with_errors = add_random_noise(message, size, amount_of_errors);
         decoded_message_with_errors = decode(message_with_errors, size)
@@ -98,7 +101,7 @@ def generate_set(set_size, size, name):
     with open(f'{path}/data/{name}', 'w+b') as f:
         pickle.dump(set, f)
 
-def load(name, x_entries):
+def load(name, x_entries="decoded"):
     data = []
     with open(f'{path}/data/{name}', 'rb') as f:
         data = pickle.load(f)
@@ -120,7 +123,7 @@ def save_metric(history_callback, model_name, metric_name):
     arr = np.array(metric)
     np.savetxt(f'{path}/models/{model_name}/{metric_name}_history.txt', arr, delimiter=",")
 
-def train_model(set, model_name, epoch_count, k, rate):
+def train_model(set, model_name, epoch_count, k, rate, loss_func="mean_absolute_error", droppout=0):
     xs, ys, _ = set
     xs = np.asarray(xs)
     ys = np.asarray(ys)
@@ -128,10 +131,12 @@ def train_model(set, model_name, epoch_count, k, rate):
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(100 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(30 * k, activation=tf.nn.sigmoid))
+    if droppout != 0:
+        model.add(tf.keras.layers.Dropout(droppout))
     model.add(tf.keras.layers.Dense(10 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
     opt = tf.keras.optimizers.Adam(learning_rate=rate)
-    model.compile(optimizer=opt, loss='mean_absolute_error', metrics=["mean_absolute_error"])
+    model.compile(optimizer=opt, loss=loss_func, metrics=[loss_func])
     history_callback = model.fit(xs, ys, epochs=epoch_count, batch_size=64, validation_split = 0.2)
 
     tf.keras.models.save_model(model, path + '/models/' + model_name)
@@ -224,10 +229,10 @@ def concat_sets(sets, resulting_set):
     with open(f'{path}/data/{resulting_set}', 'w+b') as f:
         pickle.dump(data, f)        
 
-def generate_sets(index, size, entries_count, workers):
+def generate_sets(index, size, entries_count, range_of_excluded_errors, workers):
     processes = []
     for i in range(0, workers):
-        processes.append(run_in_new_process(generate_set, (entries_count, size, f"v2_0_1_set_{size}_{entries_count}_{index}.pickle")))
+        processes.append(run_in_new_process(generate_set, (entries_count, range_of_excluded_errors, size, f"v2_0_1_set_{size}_{entries_count}_[{range_of_excluded_errors[0]}:{range_of_excluded_errors[1]}]_{index}.pickle")))
         index += 1
     for p in processes:
         p.join()   
@@ -237,14 +242,18 @@ def show_results(set_name, offset, model):
     print_data(set, [i + offset for i in [1, 2, 3, 4]], model)
     plt.show()
 
-def show_losses_macro():
-    show_losses(["g3'_model1_1", "g3'_model2_1", "g3'_model3_1"])
-    show_losses(["g3'_model1_2", "g3'_model2_2", "g3'_model3_2"])
-    show_losses(["g3'_model1_3", "g3'_model2_3", "g3'_model3_3"])
-    # show_losses(["g3'_model1_4", "g3'_model2_4", "g3'_model3_4"])
+def show_losses_macro(gen, loss_func, droppout, epochs):
+    for i in range(1, 4):
+        show_losses([
+            f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_1", 
+            f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_2", 
+            f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_3"
+        ])
     plt.show()
 
-# show_losses_macro();
+# show_results("v2_0_1_set_256_10000_[0.4:0.6]_27.pickle", 0, "g3_e2000_lmean_squared_error_d0.2_model3_1")
+# show_losses_macro(gen=3, loss_func="mean_absolute_error", droppout=0.2, epochs=2000)
+show_losses_macro(gen=3, loss_func="mean_squared_error", droppout=0.2, epochs=2000)
 
 # processes = []
 # set = load("v2_0_1_set_256_10000_13.pickle")
@@ -288,16 +297,16 @@ def show_losses_macro():
 # axs[4].bar(x, normalize(d_100), color="black")
 # plt.show()
 
-# generate_sets(index=35, size=256, entries_count=10, workers=4)
+# generate_sets(index=7, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=6)
 
 # x = range(0, 256)
-# (xs, ys, _)  = load("v2_0_1_set_256_10000_1.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10_[0.1:0.9]_7.pickle")
 # m1 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10000_2.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10_[0.1:0.9]_8.pickle")
 # m2 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10000_3.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10_[0.1:0.9]_9.pickle")
 # m3 = xs[0]
-# (xs, ys, _)  = load("v2_0_1_set_256_10000_4.pickle")
+# (xs, ys, _)  = load("v2_0_1_set_256_10_[0.1:0.9]_10.pickle")
 # m4 = xs[0]
 # fig, axs = plt.subplots(4)
 # axs[0].bar(x, m1, color="black")
@@ -306,41 +315,55 @@ def show_losses_macro():
 # axs[3].bar(x, m4, color="black")
 # plt.show()
 
-show_losses_macro()
-# show_results("v2_0_1_set_256_60000_13-18.pickle", 000, "g3_model3_1")
-# show_results("v2_0_1_set_256_10000_20.pickle", 000, "g3_model3_1")
-# show_results("v2_0_1_set_256_10000_18.pickle", "g3_model3_3")
-# show_results("v2_set_256_100_14.pickle", "g3_model3_1")
-# show_results("v2_set_256_100_15.pickle", "g3_model3_1")
-
 # concat_sets([
-#     "v2_0_1_set_256_10000_1.pickle",
-#     "v2_0_1_set_256_10000_2.pickle",
-#     "v2_0_1_set_256_10000_3.pickle",
-#     "v2_0_1_set_256_10000_4.pickle",
-#     "v2_0_1_set_256_10000_5.pickle",
-#     "v2_0_1_set_256_10000_6.pickle"
+#     "v2_0_1_set_256_10000_[0.4:0.6]_7.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_8.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_9.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_10.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_11.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_12.pickle"
 # ],
-# "v2_0_1_set_256_10000_1-6.pickle")
-
-# generate_sets(index=1, size=256, entries_count=10000, workers=6)
+# "v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
 
 # processes = []
-# set = load("v2_0_1_set_256_10000_1-6.pickle", "discrete")
-# epochs = 500
-# processes.append(run_in_new_process(train_model, (set, "g3'_model1_1", epochs, 0.5, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model1_2", epochs, 0.5, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model1_3", epochs, 0.5, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3'model1_4", epochs, 0.5, 0.012)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model2_1", epochs, 1, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model2_2", epochs, 1, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model2_3", epochs, 1, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3'model2_4", epochs, 1, 0.012)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model3_1", epochs, 2, 0.001)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model3_2", epochs, 2, 0.003)))
-# processes.append(run_in_new_process(train_model, (set, "g3'_model3_3", epochs, 2, 0.006)))
-# # processes.append(run_in_new_process(train_model, (set, "g3'model3_4", epochs, 2, 0.012)))
+# set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
+# loss_func = "mean_squared_error"
+# droppout = 0.2
+# epochs = 2000
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
 # for p in processes:
 #     p.join()
 
-# generate_sets(index=29, size=256, entries_count=10000, workers=6)
+# generate_sets(index=13, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=9)
+
+# processes = []
+# set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
+# loss_func = "mean_absolute_error"
+# droppout = 0.2
+# epochs = 2000
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
+# for p in processes:
+#     p.join()
+
+# generate_sets(index=40, size=256, entries_count=10000, range_of_excluded_errors=[0.35, 0.65], workers=10)
+# generate_sets(index=50, size=256, entries_count=10000, range_of_excluded_errors=[0.35, 0.65], workers=10)
+# generate_sets(index=60, size=256, entries_count=10000, range_of_excluded_errors=[0.40, 0.60], workers=10)
+# generate_sets(index=70, size=256, entries_count=10000, range_of_excluded_errors=[0.40, 0.60], workers=10)
+# generate_sets(index=80, size=256, entries_count=10000, range_of_excluded_errors=[0.30, 0.70], workers=10)
+# generate_sets(index=90, size=256, entries_count=10000, range_of_excluded_errors=[0.30, 0.70], workers=10)

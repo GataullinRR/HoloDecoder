@@ -133,3 +133,103 @@ Conclusions:
 
 Ideas:
 1) Try different activation function which would be better fit for discrete (binary) input data
+
+# ANN Generation 3 (next)
+
+Set             v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle
+Range of errors 0:0.4 AND 0.6:1.0
+Batch size      64
+Set             decoded
+Droppout        0.2 (from second layer)
+Loss            mean_absolute_error AND mean_absolute_error
+
+Models:         
+g3_e2000_lmean_absolute_error_d0.2_model1_1
+g3_e2000_lmean_absolute_error_d0.2_model1_2
+g3_e2000_lmean_absolute_error_d0.2_model1_3
+g3_e2000_lmean_absolute_error_d0.2_model2_1
+g3_e2000_lmean_absolute_error_d0.2_model2_2
+g3_e2000_lmean_absolute_error_d0.2_model2_3
+g3_e2000_lmean_absolute_error_d0.2_model3_1
+g3_e2000_lmean_absolute_error_d0.2_model3_2
+g3_e2000_lmean_absolute_error_d0.2_model3_3
+g3_e2000_lmean_squared_error_d0.2_model1_1
+g3_e2000_lmean_squared_error_d0.2_model1_2
+g3_e2000_lmean_squared_error_d0.2_model1_3
+g3_e2000_lmean_squared_error_d0.2_model2_1
+g3_e2000_lmean_squared_error_d0.2_model2_2
+g3_e2000_lmean_squared_error_d0.2_model2_3
+g3_e2000_lmean_squared_error_d0.2_model3_1
+g3_e2000_lmean_squared_error_d0.2_model3_2
+g3_e2000_lmean_squared_error_d0.2_model3_3
+
+mean_absolute_error: 
+
+Lowest error    g3_e2000_lmean_absolute_error_d0.2_model3_1
+architecture    200-60-20
+rate            0.003
+loss            0.006
+val_loss        0.059 ( 15.1 )
+
+Smallest NN     g3_e2000_lmean_absolute_error_d0.2_model1_2
+architecture    50-15-5
+rate            0.006
+loss            0.039
+val_loss        0.085 ( 21.8 )
+
+mean_squared_error:
+
+Lowest error    g3_e2000_lmean_squared_error_d0.2_model3_3
+architecture    200-60-20
+rate            0.012
+loss            0.000
+val_loss        0.019 ( 35.28 )
+
+Smallest NN     g3_e2000_lmean_squared_error_d0.2_model1_1
+architecture    50-15-5
+rate            0.012
+loss            0.003 ( 14.0 )
+val_loss        0.023 ( 38.8 )
+
+Observations:
+1) Using MSE creates huge error compared to MAE
+
+Ideas:
+1) Use custom loss function that will give huge error if MAE crosses 0.5/256
+2) Use bigger training set
+
+# processes = []
+# set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
+# loss_func = "mean_squared_error"
+# droppout = 0.2
+# epochs = 2000
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
+# for p in processes:
+#     p.join()
+
+# processes = []
+# set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
+# loss_func = "mean_absolute_error"
+# droppout = 0.2
+# epochs = 2000
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
+# for p in processes:
+#     p.join()
+
+# ANN Generation 4
