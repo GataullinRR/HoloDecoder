@@ -1,9 +1,12 @@
 # importing the required module
 import matplotlib.pyplot as plt
+from tensorflow.python.ops import math_ops
 import numpy as np
 from numpy import *
 from numpy import random
 import json
+
+from tensorflow.python.platform.tf_logging import error
 import tensorflow.compat.v1 as tf
 import pandas as pd
 import time
@@ -12,6 +15,8 @@ import multiprocessing
 import pickle
 import os
 import sys
+import tensorflow.compat.v1.keras as keras
+import tensorflow.compat.v1.keras.backend as K
 
 path = "/home/radmir/dev/HoloDecoder"
 
@@ -129,19 +134,105 @@ def train_model(set, model_name, epoch_count, k, rate, loss_func="mean_absolute_
     ys = np.asarray(ys)
 
     model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Dense(256 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(100 * k, activation=tf.nn.sigmoid))
-    model.add(tf.keras.layers.Dense(30 * k, activation=tf.nn.sigmoid))
     if droppout != 0:
         model.add(tf.keras.layers.Dropout(droppout))
-    model.add(tf.keras.layers.Dense(10 * k, activation=tf.nn.sigmoid))
+    model.add(tf.keras.layers.Dense(50 * k, activation=tf.nn.sigmoid))
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid))
     opt = tf.keras.optimizers.Adam(learning_rate=rate)
-    model.compile(optimizer=opt, loss=loss_func, metrics=[loss_func])
+    if loss_func == "precise_custom_loss":
+        model.compile(optimizer=opt, loss=precise_custom_loss, metrics=[percent_validation])
+    else:
+        model.compile(optimizer=opt, loss=loss_func, metrics=[percent_validation])
     history_callback = model.fit(xs, ys, epochs=epoch_count, batch_size=64, validation_split = 0.2)
 
     tf.keras.models.save_model(model, path + '/models/' + model_name)
     save_metric(history_callback, model_name, "loss")
     save_metric(history_callback, model_name, "val_loss")
+
+# def precise_custom_loss(y_true, y_pred):
+#     squared_difference = tf.square(y_true - y_pred)
+#     return tf.reduce_mean(squared_difference, axis=-1)
+
+def percent_validation(y_actual, y_pred):
+    # Input is array of rows?
+    y_actual = tf.transpose(y_actual)
+    y_pred = tf.transpose(y_pred)
+
+    threshold = tf.constant(1 / 256 / 2)
+    y_actual_abs = tf.abs(y_actual);
+    y_pred_abs = tf.abs(y_pred);
+    sub = tf.subtract(y_actual_abs, y_pred_abs)
+    sub_abs = tf.abs(sub)
+    errors = tf.subtract(sub_abs, threshold)
+    errors = tf.sign(errors) # positive = wrong classification
+    errors = tf.add(errors, tf.constant(1.0))
+    errors = tf.multiply(errors, tf.constant(0.5)) # 1 = wrong
+    errors_count = tf.reduce_sum(errors, axis=-1)
+    # print(errors_count)
+
+    tmp = tf.add(y_actual_abs, tf.constant(10000.0))
+    ons = tf.divide(tmp, tmp)
+    total_count = tf.reduce_sum(ons, axis=-1)
+    errors_percent = tf.multiply(tf.divide(errors_count, total_count), tf.constant(100.0))
+    # errors_percent = tf.divide(errors_count, total_count)
+    return errors_percent
+
+def precise_custom_loss(y_actual, y_pred):
+    threshold = tf.constant(1 / 256 / 2)
+    y_actual_abs = tf.abs(y_actual);
+    y_pred_abs = tf.abs(y_pred);
+    sub = tf.subtract(y_actual_abs, y_pred_abs)
+    sub_abs = tf.abs(sub)
+    # print(sub_abs)
+    errors = tf.subtract(sub_abs, threshold)
+    amount_of_error = tf.nn.relu(errors)
+    errors = tf.sign(errors) # positive = wrong classification
+    errors = tf.add(errors, tf.constant(1.0))
+    errors = tf.multiply(errors, tf.constant(0.5))
+
+    errors = tf.add(errors, amount_of_error) # create gradient so that model could learn
+
+    # print(errors)
+    # max_val = tf.constant(-100.0) # kinda set max
+    # errors = tf.multiply(errors, max_val)
+    #detections = tf.ceil(errors)
+    detections = errors
+
+    # flags = tf.greater_equal(sub_abs, tf.constant(threshold))
+
+    # detections = tf.cast(flags, dtype=tf.float32)
+
+    # detections = tf.where(flags, tf.ones(flags.shape, tf.float32), tf.zeros(flags.shape, tf.float32))
+    # detections = tf.where(
+    #     flags, 
+    #     tf.ones(shape=flags.shape, dtype=tf.dtypes.float32), 
+    #     tf.ones(shape=flags.shape, dtype=tf.dtypes.float32))
+    # detections = tf.cast(flags, dtype=tf.dtypes.float32)
+    # detections = tf.ones(flags.shape, tf.dtypes.float32)
+    # errors = detections
+    # return tf.reduce_mean(errors, axis=-1)
+
+    return tf.reduce_mean(detections, axis=-1)
+
+    #return tf.reduce_mean(sub_abs, axis=-1)
+
+# def precise_custom_loss(y_actual, y_pred):
+#     diff = math_ops.squared_difference(y_pred, y_actual)
+#     x_threshold = pow(0.5 / 256, 2) 
+#     y_max = 1
+#     a = pow(y_max, 0.5) / x_threshold
+#     fixed_diffs = []
+#     for i in range(0, diff.shape[0]):
+#         if diff[i] > x_threshold:
+#             fixed_diffs.append(y_max)
+#         else:
+#             # fixed_diffs.append(pow(a * diff[i], 2))
+#             val = a * diff[i]
+#             fixed_diffs.append(val * val)
+#     loss = sum(fixed_diffs) / len(fixed_diffs)
+#     return loss
 
 def evaluate_model(set_name, model_name):
     xs, ys, _ = load(set_name)
@@ -253,7 +344,7 @@ def show_losses_macro(gen, loss_func, droppout, epochs):
 
 # show_results("v2_0_1_set_256_10000_[0.4:0.6]_27.pickle", 0, "g3_e2000_lmean_squared_error_d0.2_model3_1")
 # show_losses_macro(gen=3, loss_func="mean_absolute_error", droppout=0.2, epochs=2000)
-show_losses_macro(gen=3, loss_func="mean_squared_error", droppout=0.2, epochs=2000)
+# show_losses_macro(gen=3, loss_func="mean_squared_error", droppout=0.2, epochs=2000)
 
 # processes = []
 # set = load("v2_0_1_set_256_10000_13.pickle")
@@ -316,33 +407,93 @@ show_losses_macro(gen=3, loss_func="mean_squared_error", droppout=0.2, epochs=20
 # plt.show()
 
 # concat_sets([
-#     "v2_0_1_set_256_10000_[0.4:0.6]_7.pickle",
-#     "v2_0_1_set_256_10000_[0.4:0.6]_8.pickle",
-#     "v2_0_1_set_256_10000_[0.4:0.6]_9.pickle",
-#     "v2_0_1_set_256_10000_[0.4:0.6]_10.pickle",
-#     "v2_0_1_set_256_10000_[0.4:0.6]_11.pickle",
-#     "v2_0_1_set_256_10000_[0.4:0.6]_12.pickle"
+#     "v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_13.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_14.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_15.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_16.pickle",
+
+#     "v2_0_1_set_256_10000_[0.4:0.6]_17.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_18.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_19.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_20.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_21.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_22.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_23.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_24.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_25.pickle",
+#     "v2_0_1_set_256_10000_[0.4:0.6]_26.pickle",
 # ],
-# "v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
+# "v2_0_1_set_256_200000_[0.4:0.6]_7-26.pickle")
+
+# y_actual = tf.constant(  [0, 0.1, 0.2,  0.3,    1,   1,   1     , -1, -2])
+# y_expected = tf.constant([0, 0.1, 0.25, 0.3001, 1.3, 0.9, 0.9999, -1, -2.3])
+# print(percent_validation(y_actual, y_expected))
+
+# y_actual = tf.constant(  [[0], [0.1], [0.2],  [0.3],    [1],   [1],   [1]])
+# y_expected = tf.constant([[0], [0.1], [0.25], [0.3001], [1.3], [0.9], [0.9999]])
+# print(percent_validation(y_actual, y_expected))
+
+# y_actual = tf.transpose(y_actual)
+# y_expected = tf.transpose(y_expected)
+# print(percent_validation(y_actual, y_expected))
+
+processes = []
+set = load("v2_0_1_set_256_200000_[0.4:0.6]_7-26.pickle")
+# set = load("v2_0_1_set_256_10000_[0.4:0.6]_7.pickle")
+loss_func = "mean_absolute_error"
+droppout = 0
+epochs = 2000
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 1, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 1, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 1, 0.012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_4", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_5", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_6", epochs, 0.5, 0.012, loss_func, droppout)))
+
+loss_func = "mean_squared_error"
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_4", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_5", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_6", epochs, 0.5, 0.012, loss_func, droppout)))
+for p in processes:
+    p.join()
 
 # processes = []
+# gen = 4
 # set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
-# loss_func = "mean_squared_error"
+# loss_func = "precise_custom_loss"
 # droppout = 0.2
-# epochs = 2000
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g3_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
+# epochs = 100
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 0.5, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 0.5, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 0.5, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.0012, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 2, 0.003, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 2, 0.006, loss_func, droppout)))
+# processes.append(run_in_new_process(train_model, (set, f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 2, 0.0012, loss_func, droppout)))
 # for p in processes:
 #     p.join()
 
-# generate_sets(index=13, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=9)
+# generate_sets(index=170, size=256, entries_count=10000, range_of_excluded_errors=[0.3, 0.7], workers=10)
+# generate_sets(index=180, size=256, entries_count=10000, range_of_excluded_errors=[0.3, 0.7], workers=10)
+# generate_sets(index=190, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=200, size=256, entries_count=10000, range_of_excluded_errors=[0.3, 0.7], workers=10)
+# generate_sets(index=210, size=256, entries_count=10000, range_of_excluded_errors=[0.3, 0.7], workers=10)
+# generate_sets(index=220, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=230, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=240, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=250, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=260, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=270, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=280, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=290, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=300, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
+# generate_sets(index=310, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=10)
 
 # processes = []
 # set = load("v2_0_1_set_256_60000_[0.4:0.6]_7-12.pickle")
