@@ -1,4 +1,5 @@
 # importing the required module
+from operator import xor
 import matplotlib.pyplot as plt
 from tensorflow.python.ops import math_ops
 import numpy as np
@@ -150,10 +151,8 @@ def train_model(set, model_name, epoch_count, k, rate, loss_func="mean_absolute_
     tf.keras.models.save_model(model, path + '/models/' + model_name)
     save_metric(history_callback, model_name, "loss")
     save_metric(history_callback, model_name, "val_loss")
-
-# def precise_custom_loss(y_true, y_pred):
-#     squared_difference = tf.square(y_true - y_pred)
-#     return tf.reduce_mean(squared_difference, axis=-1)
+    save_metric(history_callback, model_name, "percent_validation")
+    save_metric(history_callback, model_name, "val_percent_validation")
 
 def percent_validation(y_actual, y_pred):
     # Input is array of rows?
@@ -180,59 +179,28 @@ def percent_validation(y_actual, y_pred):
     return errors_percent
 
 def precise_custom_loss(y_actual, y_pred):
-    threshold = tf.constant(1 / 256 / 2)
-    y_actual_abs = tf.abs(y_actual);
-    y_pred_abs = tf.abs(y_pred);
-    sub = tf.subtract(y_actual_abs, y_pred_abs)
-    sub_abs = tf.abs(sub)
-    # print(sub_abs)
-    errors = tf.subtract(sub_abs, threshold)
-    amount_of_error = tf.nn.relu(errors)
-    errors = tf.sign(errors) # positive = wrong classification
-    errors = tf.add(errors, tf.constant(1.0))
-    errors = tf.multiply(errors, tf.constant(0.5))
+    # Input is array of rows?
+    y_actual = tf.transpose(y_actual)
+    y_pred = tf.transpose(y_pred)    
 
-    errors = tf.add(errors, amount_of_error) # create gradient so that model could learn
+    x = tf.subtract(y_actual, y_pred)
 
-    # print(errors)
-    # max_val = tf.constant(-100.0) # kinda set max
-    # errors = tf.multiply(errors, max_val)
-    #detections = tf.ceil(errors)
-    detections = errors
+    return tf.reduce_mean(ls(x), axis=-1)
 
-    # flags = tf.greater_equal(sub_abs, tf.constant(threshold))
+def ls(x):
+    # 0.8
+    threshold = 1 / 256 / 2
+    x_coef = 2 / threshold
+    a = tf.constant(-0.001)
+    # a = tf.constant(1.0)
 
-    # detections = tf.cast(flags, dtype=tf.float32)
+    nom = tf.abs(tf.subtract(tf.constant(2.0), a))
+    mul1 = tf.divide(nom, a)
+    x = tf.multiply(x, tf.constant(x_coef))
+    x = tf.multiply(x, x)
+    mul2 = tf.subtract(tf.pow(tf.add(tf.divide(tf.multiply(x, x), nom), tf.constant(1.0)), tf.div(a, tf.constant(2.0))), tf.constant(1.0))
 
-    # detections = tf.where(flags, tf.ones(flags.shape, tf.float32), tf.zeros(flags.shape, tf.float32))
-    # detections = tf.where(
-    #     flags, 
-    #     tf.ones(shape=flags.shape, dtype=tf.dtypes.float32), 
-    #     tf.ones(shape=flags.shape, dtype=tf.dtypes.float32))
-    # detections = tf.cast(flags, dtype=tf.dtypes.float32)
-    # detections = tf.ones(flags.shape, tf.dtypes.float32)
-    # errors = detections
-    # return tf.reduce_mean(errors, axis=-1)
-
-    return tf.reduce_mean(detections, axis=-1)
-
-    #return tf.reduce_mean(sub_abs, axis=-1)
-
-# def precise_custom_loss(y_actual, y_pred):
-#     diff = math_ops.squared_difference(y_pred, y_actual)
-#     x_threshold = pow(0.5 / 256, 2) 
-#     y_max = 1
-#     a = pow(y_max, 0.5) / x_threshold
-#     fixed_diffs = []
-#     for i in range(0, diff.shape[0]):
-#         if diff[i] > x_threshold:
-#             fixed_diffs.append(y_max)
-#         else:
-#             # fixed_diffs.append(pow(a * diff[i], 2))
-#             val = a * diff[i]
-#             fixed_diffs.append(val * val)
-#     loss = sum(fixed_diffs) / len(fixed_diffs)
-#     return loss
+    return tf.multiply(mul1, mul2)
 
 def evaluate_model(set_name, model_name):
     xs, ys, _ = load(set_name)
@@ -252,8 +220,10 @@ def show_losses(models):
     for i, model_name in enumerate(models):
         loss = np.loadtxt(f"{path}/models/{model_name}/loss_history.txt", delimiter=",")
         val_loss = np.loadtxt(f"{path}/models/{model_name}/val_loss_history.txt", delimiter=",")
+        percent_validation = np.loadtxt(f"{path}/models/{model_name}/percent_validation_history.txt", delimiter=",")
+        val_percent_validation = np.loadtxt(f"{path}/models/{model_name}/val_percent_validation_history.txt", delimiter=",")
         x = range(0, loss.size)
-        axs[i].set_title(f'{model_name} loss.min: {round(loss.min(), 3)} val_loss.min: {round(val_loss.min(), 3)}')
+        axs[i].set_title(f'{model_name} loss.min: {round(loss.min(), 3)}/{round(val_loss.min(), 3)} percent_validation.min: {round(percent_validation.min(), 1)}/{round(val_percent_validation.min(), 1)}')
         axs[i].plot(x, loss, color="blue")
         axs[i].plot(x, val_loss, color="red")
         axs[i].legend(['loss', 'val_loss'])
@@ -333,17 +303,40 @@ def show_results(set_name, offset, model):
     print_data(set, [i + offset for i in [1, 2, 3, 4]], model)
     plt.show()
 
-def show_losses_macro(gen, loss_func, droppout, epochs):
-    for i in range(1, 4):
+def show_losses_macro(gen, loss_funcs, droppout, epochs):
+    i = 1
+    for loss_func in loss_funcs: 
         show_losses([
             f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_1", 
             f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_2", 
             f"g{gen}_e{epochs}_l{loss_func}_d{droppout}_model{i}_3"
         ])
+        i = i + 1
     plt.show()
 
+
+# def ls(x):
+#     # 0.8
+#     threshold = 1 / 256 / 2
+#     x_coef = 2 / threshold
+#     a = tf.constant(1.0)
+
+#     nom = tf.abs(tf.subtract(tf.constant(2.0), a))
+#     mul1 = tf.divide(nom, a)
+#     x = tf.multiply(x, tf.constant(x_coef))
+#     x = tf.multiply(x, x)
+#     mul2 = tf.subtract(tf.pow(tf.add(tf.divide(tf.multiply(x, x), nom), tf.constant(1.0)), tf.div(a, tf.constant(2.0))), tf.constant(1.0))
+
+#     return tf.multiply(mul1, mul2)
+
+# xs = tf.range(start=-2, limit=2, delta=0.0001, dtype=tf.float32, name='range')
+# res = ls(xs).numpy()
+# x = range(0, len(res))
+# plt.plot(x, res, color="black")
+# plt.show()
+
 # show_results("v2_0_1_set_256_10000_[0.4:0.6]_27.pickle", 0, "g3_e2000_lmean_squared_error_d0.2_model3_1")
-# show_losses_macro(gen=3, loss_func="mean_absolute_error", droppout=0.2, epochs=2000)
+# show_losses_macro(gen=5, loss_funcs=["mean_absolute_error", "mean_squared_error"], droppout=0, epochs=1000)
 # show_losses_macro(gen=3, loss_func="mean_squared_error", droppout=0.2, epochs=2000)
 
 # processes = []
@@ -388,7 +381,7 @@ def show_losses_macro(gen, loss_func, droppout, epochs):
 # axs[4].bar(x, normalize(d_100), color="black")
 # plt.show()
 
-# generate_sets(index=7, size=256, entries_count=10000, range_of_excluded_errors=[0.4, 0.6], workers=6)
+
 
 # x = range(0, 256)
 # (xs, ys, _)  = load("v2_0_1_set_256_10_[0.1:0.9]_7.pickle")
@@ -440,26 +433,49 @@ def show_losses_macro(gen, loss_func, droppout, epochs):
 
 processes = []
 set = load("v2_0_1_set_256_200000_[0.4:0.6]_7-26.pickle")
-# set = load("v2_0_1_set_256_10000_[0.4:0.6]_7.pickle")
-loss_func = "mean_absolute_error"
+loss_func = "precise_custom_loss"
 droppout = 0
-epochs = 2000
+epochs = 1000
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_1", epochs, 1, 0.003, loss_func, droppout)))
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_2", epochs, 1, 0.006, loss_func, droppout)))
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_3", epochs, 1, 0.012, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_4", epochs, 0.5, 0.003, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_5", epochs, 0.5, 0.006, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_6", epochs, 0.5, 0.012, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_4", epochs, 0.5, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_5", epochs, 0.5, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model1_6", epochs, 0.5, 0.012, loss_func, droppout)))
 
-loss_func = "mean_squared_error"
+droppout = 0.2
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_1", epochs, 1, 0.003, loss_func, droppout)))
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_2", epochs, 1, 0.006, loss_func, droppout)))
 processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_3", epochs, 1, 0.012, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_4", epochs, 0.5, 0.003, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_5", epochs, 0.5, 0.006, loss_func, droppout)))
-# processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_6", epochs, 0.5, 0.012, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_4", epochs, 0.5, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_5", epochs, 0.5, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model2_6", epochs, 0.5, 0.012, loss_func, droppout)))
 for p in processes:
     p.join()
+
+processes = []
+set = load("v2_0_1_set_256_200000_[0.4:0.6]_7-26.pickle")
+loss_func = "mean_absolute_error"
+droppout = 0
+epochs = 1000
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_1", epochs, 1, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_2", epochs, 1, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_3", epochs, 1, 0.012, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_4", epochs, 0.5, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_5", epochs, 0.5, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model3_6", epochs, 0.5, 0.012, loss_func, droppout)))
+
+loss_func = "mean_squared_error"
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_1", epochs, 1, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_2", epochs, 1, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_3", epochs, 1, 0.012, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_4", epochs, 0.5, 0.003, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_5", epochs, 0.5, 0.006, loss_func, droppout)))
+processes.append(run_in_new_process(train_model, (set, f"g5_e{epochs}_l{loss_func}_d{droppout}_model4_6", epochs, 0.5, 0.012, loss_func, droppout)))
+for p in processes:
+    p.join()
+
+# generate_sets(index=320, size=256, entries_count=10000, range_of_excluded_errors=[0, 1], workers=10)
 
 # processes = []
 # gen = 4
